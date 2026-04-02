@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebRTC Video Chat</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f0f13;
+      color: #e4e4e7;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .logo {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+
+    .subtitle {
+      color: #71717a;
+      font-size: 15px;
+      margin-bottom: 40px;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .card {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 16px;
+      padding: 32px;
+      width: 100%;
+      max-width: 420px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: #a1a1aa;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      background: #09090b;
+      border: 1px solid #27272a;
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #fff;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input[type="text"]:focus {
+      border-color: #6366f1;
+    }
+
+    button {
+      background: #6366f1;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+
+    button:hover { background: #4f46e5; }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 24px 0;
+      color: #3f3f46;
+      font-size: 13px;
+    }
+    .divider::before, .divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: #27272a;
+    }
+
+    .quick-join {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .room-btn {
+      background: #09090b;
+      border: 1px solid #27272a;
+      color: #e4e4e7;
+      font-weight: 400;
+      text-align: left;
+      padding: 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .room-btn:hover { background: #18181b; border-color: #6366f1; }
+
+    .badge {
+      font-size: 11px;
+      background: #27272a;
+      padding: 2px 8px;
+      border-radius: 99px;
+      color: #71717a;
+    }
+
+    .how {
+      margin-top: 40px;
+      max-width: 420px;
+      text-align: center;
+    }
+
+    .how h2 {
+      font-size: 13px;
+      color: #52525b;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 20px;
+    }
+
+    .steps {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      width: 100px;
+    }
+
+    .step .icon {
+      font-size: 28px;
+    }
+
+    .step p {
+      font-size: 12px;
+      color: #52525b;
+      text-align: center;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="logo">📹</div>
+  <h1>WebRTC Video Chat</h1>
+  <p class="subtitle">
+    Direct browser-to-browser video and audio.<br>
+    No accounts. No plugins. No media server.
+  </p>
+
+  <div class="card">
+    <label>Create or join a room</label>
+    <div class="input-row">
+      <input type="text" id="roomInput" placeholder="room-name" value="">
+      <button onclick="joinRoom()">Join →</button>
+    </div>
+
+    <div class="divider">or try a demo room</div>
+
+    <div class="quick-join">
+      <button class="room-btn" onclick="window.location='/room/demo'">
+        demo <span class="badge">public</span>
+      </button>
+      <button class="room-btn" onclick="window.location='/room/sjsu-lab'">
+        sjsu-lab <span class="badge">public</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="how">
+    <h2>How it works</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="icon">🔗</div>
+        <p>Share a room link with someone</p>
+      </div>
+      <div class="step">
+        <div class="icon">🤝</div>
+        <p>Browser negotiates a direct peer connection</p>
+      </div>
+      <div class="step">
+        <div class="icon">🔒</div>
+        <p>Video streams peer-to-peer, encrypted end-to-end</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Generate a random room ID as the default
+    const adjectives = ["swift", "quiet", "bright", "calm", "clean"];
+    const nouns = ["river", "falcon", "orbit", "signal", "cipher"];
+    const rand = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    document.getElementById("roomInput").value =
+      `${rand(adjectives)}-${rand(nouns)}-${Math.floor(Math.random() * 900 + 100)}`;
+
+    function joinRoom() {
+      const name = document.getElementById("roomInput").value.trim()
+        .toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-");
+      if (name) window.location = `/room/${name}`;
+    }
+
+    document.getElementById("roomInput").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") joinRoom();
+    });
+  </script>
+
+</body>
+</html>

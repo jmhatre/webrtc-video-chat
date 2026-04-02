@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebRTC Room</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #09090b;
+      color: #e4e4e7;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ────────────────────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      background: #0f0f13;
+      border-bottom: 1px solid #1c1c22;
+      flex-shrink: 0;
+      gap: 12px;
+    }
+
+    .room-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .room-name {
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #52525b;
+      transition: background 0.3s;
+    }
+    .status-dot.waiting  { background: #f59e0b; }
+    .status-dot.connected { background: #22c55e; animation: pulse 2s infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    #statusText {
+      font-size: 13px;
+      color: #71717a;
+    }
+
+    .copy-btn {
+      background: #18181b;
+      border: 1px solid #27272a;
+      color: #a1a1aa;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .copy-btn:hover { border-color: #6366f1; color: #fff; }
+
+    /* ── Video Grid ─────────────────────────────────────────────────────── */
+    .video-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      padding: 4px;
+      background: #000;
+      overflow: hidden;
+    }
+
+    .video-grid.solo {
+      grid-template-columns: 1fr;
+    }
+
+    .video-wrapper {
+      position: relative;
+      background: #0f0f13;
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .video-label {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+      background: rgba(0,0,0,0.5);
+      padding: 4px 10px;
+      border-radius: 99px;
+      backdrop-filter: blur(4px);
+    }
+
+    .waiting-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background: #0f0f13;
+    }
+
+    .waiting-overlay .icon { font-size: 40px; }
+    .waiting-overlay p { color: #52525b; font-size: 14px; text-align: center; line-height: 1.5; }
+    .waiting-overlay code {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 13px;
+      color: #a1a1aa;
+    }
+
+    /* ── Controls ───────────────────────────────────────────────────────── */
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 16px 20px;
+      background: #0f0f13;
+      border-top: 1px solid #1c1c22;
+      flex-shrink: 0;
+    }
+
+    .ctrl-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 12px;
+      padding: 10px 16px;
+      color: #e4e4e7;
+      cursor: pointer;
+      font-size: 11px;
+      transition: all 0.15s;
+      min-width: 64px;
+    }
+
+    .ctrl-btn .icon { font-size: 20px; }
+    .ctrl-btn:hover { border-color: #6366f1; }
+    .ctrl-btn.active { background: #3f3f46; border-color: #52525b; }
+    .ctrl-btn.danger { border-color: #ef4444; color: #ef4444; }
+    .ctrl-btn.danger:hover { background: #ef4444; color: #fff; }
+
+    /* ── Connection info panel ──────────────────────────────────────────── */
+    #infoPanel {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    #infoPanel.open { display: flex; }
+
+    .info-card {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 16px;
+      padding: 24px;
+      max-width: 480px;
+      width: 100%;
+    }
+
+    .info-card h3 {
+      font-size: 15px;
+      margin-bottom: 16px;
+      color: #fff;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #27272a;
+      font-size: 13px;
+    }
+
+    .info-row:last-child { border-bottom: none; }
+    .info-row .key { color: #71717a; }
+    .info-row .val { color: #e4e4e7; font-family: monospace; }
+
+    .close-btn {
+      margin-top: 16px;
+      width: 100%;
+      background: #27272a;
+      border: none;
+      color: #e4e4e7;
+      border-radius: 8px;
+      padding: 10px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="room-info">
+    <div class="status-dot waiting" id="statusDot"></div>
+    <span class="room-name" id="roomName">Loading...</span>
+    <span id="statusText">Waiting for peer...</span>
+  </div>
+  <button class="copy-btn" onclick="copyLink()">📋 Copy link</button>
+</header>
+
+<!-- Videos -->
+<div class="video-grid solo" id="videoGrid">
+  <div class="video-wrapper" id="localWrapper">
+    <video id="localVideo" autoplay muted playsinline></video>
+    <div class="video-label">You</div>
+  </div>
+
+  <div class="video-wrapper" id="remoteWrapper" style="display:none">
+    <video id="remoteVideo" autoplay playsinline></video>
+    <div class="video-label">Peer</div>
+    <div class="waiting-overlay" id="remoteOverlay">
+      <div class="icon">👤</div>
+      <p>Waiting for peer to join…<br>
+        <code id="shareUrl"></code>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <button class="ctrl-btn" id="micBtn" onclick="toggleMic()">
+    <span class="icon">🎙</span>
+    <span>Mute</span>
+  </button>
+  <button class="ctrl-btn" id="camBtn" onclick="toggleCam()">
+    <span class="icon">📷</span>
+    <span>Camera</span>
+  </button>
+  <button class="ctrl-btn" onclick="toggleInfo()">
+    <span class="icon">ℹ️</span>
+    <span>Info</span>
+  </button>
+  <button class="ctrl-btn danger" onclick="hangup()">
+    <span class="icon">📵</span>
+    <span>Leave</span>
+  </button>
+</div>
+
+<!-- Connection info panel -->
+<div id="infoPanel">
+  <div class="info-card">
+    <h3>Connection Details</h3>
+    <div class="info-row">
+      <span class="key">Room</span>
+      <span class="val" id="infoRoom">—</span>
+    </div>
+    <div class="info-row">
+      <span class="key">ICE State</span>
+      <span class="val" id="infoIce">—</span>
+    </div>
+    <div class="info-row">
+      <span class="key">Signaling State</span>
+      <span class="val" id="infoSig">—</span>
+    </div>
+    <div class="info-row">
+      <span class="key">Connection State</span>
+      <span class="val" id="infoConn">—</span>
+    </div>
+    <div class="info-row">
+      <span class="key">Local SDP type</span>
+      <span class="val" id="infoSdp">—</span>
+    </div>
+    <button class="close-btn" onclick="toggleInfo()">Close</button>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/client.js"></script>
+
+</body>
+</html>
